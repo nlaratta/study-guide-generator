@@ -26,6 +26,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Saved responses
+saved_responses.json
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -70,6 +73,10 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+
+# Docs
+VISION.md
+CLAUDE.md
 
 # PyBuilder
 .pybuilder/

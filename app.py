@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class Config:
     """Application configuration settings."""
     OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
-    DEFAULT_STEPS: int = int(os.getenv('DEFAULT_STEPS', '1'))
+    DEFAULT_STEPS: int = int(os.getenv('DEFAULT_STEPS', '6'))
     RESPONSES_FILE: str = 'saved_responses.json'
     MODEL: str = "gpt-4o"
 
@@ -114,29 +114,57 @@ Maintain this context for all responses and ensure each step builds upon previou
     def get_step_prompt(step: int, subject: str) -> str:
         """Returns the prompt for a specific step in the study guide generation process."""
         prompts = {
-            0: f"""Create the first part of a study guide for {subject}. Include:
-1. A clear introduction to the subject
-2. Key foundational concepts that must be understood
-3. Common misconceptions to avoid
-4. Initial learning objectives""",
+            0: f"""**Step 1: Knowledge Assessment**
+Create a comprehensive knowledge assessment for {subject}. Include:
+1. Pre-assessment questions to gauge current understanding
+2. Key prerequisite knowledge needed
+3. Common misconceptions and knowledge gaps
+4. Self-evaluation checklist with skill levels (beginner/intermediate/advanced)
+5. Recommended starting points based on different knowledge levels""",
             
-            1: """Building on the previous content, outline:
-1. Intermediate concepts
-2. Practical exercises
-3. Study techniques
-4. Progress tracking methods""",
+            1: f"""**Step 2: Learning Path Design**
+Design a structured learning path for {subject}. Include:
+1. Clear learning objectives and milestones
+2. Topic progression from foundational to advanced
+3. Estimated time for each topic/module
+4. Alternative paths for different learning styles
+5. Key concepts and their relationships (concept map)""",
             
-            2: """For the advanced section, provide:
-1. Complex topics and their relationships
-2. Real-world applications
-3. Advanced resources
-4. Mastery indicators""",
+            2: f"""**Step 3: Resource Curation**
+Curate comprehensive learning resources for {subject}. Include:
+1. Essential textbooks and reading materials
+2. Online courses and video tutorials (with links)
+3. Interactive tools and simulations
+4. Practice websites and platforms
+5. Community forums and study groups
+6. Free vs paid resource recommendations""",
             
-            3: """Create a summary section with:
-1. Review of key points
-2. Common pitfalls to avoid
-3. Next steps for further learning
-4. Self-assessment questions""",
+            3: f"""**Step 4: Practice Framework**
+Create a hands-on practice framework for {subject}. Include:
+1. Beginner exercises with solutions
+2. Intermediate challenges and projects
+3. Advanced real-world applications
+4. Common mistakes and how to avoid them
+5. Self-check rubrics for each practice level
+6. Recommended practice schedule""",
+            
+            4: f"""**Step 5: Progress Tracking**
+Design a progress tracking system for {subject}. Include:
+1. Key performance indicators (KPIs) for learning
+2. Weekly/monthly assessment templates
+3. Progress visualization methods
+4. Milestone celebrations and rewards
+5. Adjustment strategies when falling behind
+6. Portfolio building suggestions""",
+            
+            5: f"""**Step 6: Schedule Generation**
+Generate a personalized study schedule for {subject}. Include:
+1. Weekly study plan based on available hours
+2. Daily learning activities breakdown
+3. Spaced repetition schedule for retention
+4. Buffer time for review and catch-up
+5. Integration with work/life commitments
+6. Flexibility guidelines for schedule adjustments""",
         }
         return prompts.get(step, f"Continue the study guide for {subject}, building upon previous content.")
 
@@ -144,7 +172,7 @@ class OpenAIService:
     """Handles interactions with OpenAI API."""
     
     @staticmethod
-    async def generate_response(system_prompt: str, user_prompt: str, previous_responses: List[str]) -> str:
+    def generate_response(system_prompt: str, user_prompt: str, previous_responses: List[str]) -> str:
         """Generate a response using OpenAI's API."""
         try:
             messages = [{"role": "system", "content": system_prompt}]
@@ -156,7 +184,7 @@ class OpenAIService:
             # Add current prompt
             messages.append({"role": "user", "content": user_prompt})
             
-            response = await openai.ChatCompletion.acreate(
+            response = openai.ChatCompletion.create(
                 model=config.MODEL,
                 messages=messages,
                 temperature=0.7,
@@ -176,7 +204,7 @@ def home():
     return render_template('index.html', default_steps=config.DEFAULT_STEPS)
 
 @app.route('/generate', methods=['POST'])
-async def generate_study_guide():
+def generate_study_guide():
     """Generate a step of the study guide."""
     try:
         data = request.json
@@ -194,7 +222,7 @@ async def generate_study_guide():
         step_prompt = PromptManager.get_step_prompt(step, subject)
         previous_responses = data.get('previousResponses', [])
         
-        response = await OpenAIService.generate_response(
+        response = OpenAIService.generate_response(
             system_prompt,
             step_prompt,
             previous_responses
@@ -210,7 +238,7 @@ async def generate_study_guide():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/get_component_details', methods=['POST'])
-async def get_component_details():
+def get_component_details():
     """Get detailed explanation of a specific component."""
     try:
         data = request.json
@@ -228,7 +256,7 @@ Include:
 4. Learning resources and tips"""
         
         system_message = f"You are a fun loving, world-class expert, professor, and educator in {subject}"
-        response = await OpenAIService.generate_response(system_message, prompt, [])
+        response = OpenAIService.generate_response(system_message, prompt, [])
         
         return jsonify({"response": response})
     

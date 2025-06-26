@@ -65,6 +65,7 @@ The application will be available at `http://localhost:5000`
 
 3. Review each section of your study guide:
    - Click on core components in Step 1 for detailed explanations
+   - **Highlight any text** in the study guide to get further AI-powered explanations
    - Follow the structured learning path
    - Use the curated resources
    - Follow the practice framework

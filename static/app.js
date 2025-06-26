@@ -102,7 +102,19 @@ class UIComponents {
     updateStepCard(card, content, stepNumber) {
         card.querySelector('.loading-bar').remove();
         card.querySelector('.loading-text').remove();
-        card.querySelector('.step-content').innerHTML = marked.parse(content);
+        
+        const contentDiv = card.querySelector('.step-content');
+        contentDiv.innerHTML = marked.parse(content);
+        
+        // Add progress tracking button
+        const progressActions = document.createElement('div');
+        progressActions.className = 'progress-actions';
+        progressActions.innerHTML = `
+            <button class="mark-complete-btn" data-step="${stepNumber}">
+                Mark Step ${stepNumber} Complete
+            </button>
+        `;
+        card.appendChild(progressActions);
     }
 
     showError(stepCard, error) {
@@ -361,9 +373,27 @@ class StudyGuideGenerator {
         this.ui = new UIComponents();
         this.state = new UIState();
         this.selectionHandler = new SelectionHandler(this.ui, this.state);
+        this.progressTracker = new ProgressTracker();
         
         // Bind form submission
         this.ui.studyForm.addEventListener('submit', (e) => this.handleFormSubmit(e));
+        
+        // Bind progress tracking button clicks
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('mark-complete-btn')) {
+                const stepNumber = parseInt(e.target.dataset.step);
+                const subject = this.selectionHandler.currentSubject;
+                
+                if (subject && stepNumber) {
+                    this.progressTracker.markStepCompleted(subject, stepNumber);
+                    e.target.textContent = 'Completed!';
+                    e.target.disabled = true;
+                    
+                    // Add study time (5 minutes per step as estimate)
+                    this.progressTracker.addStudyTime(subject, 5);
+                }
+            }
+        });
     }
 
     async handleFormSubmit(e) {
@@ -381,6 +411,10 @@ class StudyGuideGenerator {
 
         // Update current subject for the selection handler
         this.selectionHandler.setCurrentSubject(formData.subject);
+        
+        // Initialize progress tracking for this subject
+        this.progressTracker.initializeSubject(formData.subject, parseInt(formData.maxSteps));
+        this.progressTracker.updateProgressUI(formData.subject);
         
         console.log('Form data:', formData);
         this.ui.resultsDiv.innerHTML = '';
