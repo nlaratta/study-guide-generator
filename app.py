@@ -13,7 +13,10 @@ from typing import Dict, List, Optional, TypedDict
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-import openai
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -24,13 +27,25 @@ logger = logging.getLogger(__name__)
 
 class Config:
     """Application configuration settings."""
-    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
     DEFAULT_STEPS: int = int(os.getenv('DEFAULT_STEPS', '6'))
-    RESPONSES_FILE: str = 'saved_responses.json'
-    MODEL: str = "gpt-4o"
+    RESPONSES_FILE: str = os.getenv('RESPONSES_FILE', 'saved_responses.json')
+    MODEL: str = os.getenv('OPENAI_MODEL', 'gpt-4o')
 
 config = Config()
-openai.api_key = config.OPENAI_API_KEY
+
+
+class MissingAPIKeyError(RuntimeError):
+    """Raised when OPENAI_API_KEY is not configured."""
+
+
+def get_client() -> OpenAI:
+    """Build an OpenAI client, failing clearly if no API key is set."""
+    api_key = os.getenv('OPENAI_API_KEY', '').strip()
+    if not api_key:
+        raise MissingAPIKeyError(
+            "OPENAI_API_KEY is not set. Copy .env.example to .env and add your key."
+        )
+    return OpenAI(api_key=api_key)
 
 # Type definitions
 class StudyGuideRequest(TypedDict):
@@ -184,16 +199,17 @@ class OpenAIService:
             # Add current prompt
             messages.append({"role": "user", "content": user_prompt})
             
-            response = openai.ChatCompletion.create(
+            client = get_client()
+            response = client.chat.completions.create(
                 model=config.MODEL,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=2000,
-                n=1,
-                stop=None,
+                max_completion_tokens=2000,
             )
             
             return response.choices[0].message.content
+        except MissingAPIKeyError:
+            raise
         except Exception as e:
             logger.error(f"OpenAI API error: {e}")
             raise
@@ -207,7 +223,7 @@ def home():
 def generate_study_guide():
     """Generate a step of the study guide."""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         subject = data.get('subject', '')
         step = data.get('step', 0)
         
@@ -233,6 +249,8 @@ def generate_study_guide():
         
         return jsonify({"response": response})
     
+    except MissingAPIKeyError as e:
+        return jsonify({"error": str(e)}), 503
     except Exception as e:
         logger.error(f"Error generating response: {e}")
         return jsonify({"error": str(e)}), 500
@@ -241,7 +259,7 @@ def generate_study_guide():
 def get_component_details():
     """Get detailed explanation of a specific component."""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         component = data.get('component')
         subject = data.get('subject')
         
@@ -260,9 +278,14 @@ Include:
         
         return jsonify({"response": response})
     
+    except MissingAPIKeyError as e:
+        return jsonify({"error": str(e)}), 503
     except Exception as e:
         logger.error(f"Error getting component details: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(
+        port=int(os.getenv('PORT', '5001')),
+        debug=os.getenv('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes'),
+    )
